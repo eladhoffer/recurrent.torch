@@ -109,7 +109,7 @@ local optimizer = Optimizer{
 ----------------------------------------------------------------------
 ---utility functions
 local function applyRecurrent(func, ...)
-    for i, rnn in pairs(model:findModules('nn.Recurrent')) do
+    for i, rnn in pairs(model:findModules('nn.RecurrentContainer')) do
         if opt.nGPU > 1 then
             cutorch.setDevice(i)
         end
