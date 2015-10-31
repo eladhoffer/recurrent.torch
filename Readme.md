@@ -1,5 +1,5 @@
 #Recurrent Container for Torch nn modules
-This is a simple and efficient way to create recurrent nn modules in Torch. It consists of a container **RecurrentContainer**, which holds a recurrent module.
+This is a simple and efficient way to create recurrent nn modules in Torch. It consists of a container **nn.RecurrentContainer**, which holds a recurrent module.
 This recurrent module is expected to receive an input of: `{input, state}` and outputs `{output, state}`. This way, a recurrent module is expected to receive an input and the
 current state, and updates its state while giving an output.
 For example, a simple RNN module can be:
@@ -15,7 +15,7 @@ rnn:add(outputConcat)
 ```
 And the Recurrent container will be configured as:
 ```lua
-local recurrent = RecurrentContainer(rnnModule)
+local recurrent = nn.RecurrentContainer(rnnModule)
 ```
 
 ###Recurrent container modes
