@@ -87,7 +87,7 @@ if paths.filep(opt.load) then
     print('==>Loaded Net from: ' .. opt.load)
 else
     modelConfig = require(opt.model)(opt.embeddingSize, opt.rnnSize,  opt.numLayers, opt.dropout, opt.initWeight)
-    modelConfig.recurrent = nn.Recurrent(modelConfig.rnnModule):sequence()
+    modelConfig.recurrent = RecurrentContainer(modelConfig.rnnModule):sequence()
     modelConfig.embedder = nn.LookupTable(vocabSize, opt.embeddingSize)
     modelConfig.classifier = nn.Linear(opt.rnnSize, vocabSize)
   --  modelConfig.classifier = nn.TemporalConvolution(opt.rnnSize, vocabSize, 1)

@@ -1,4 +1,4 @@
-local Recurrent, parent = torch.class('nn.Recurrent', 'nn.Container')
+local Recurrent, parent = torch.class('RecurrentContainer', 'nn.Container')
 
 local function recursiveCopy(t1, t2)
     if torch.type(t2) == 'table' then
@@ -303,7 +303,7 @@ function Recurrent:updateParameters(learningRate)
 end
 
 function Recurrent:clone(...)
-    return nn.Recurrent(self.modules[1]:clone(...))
+    return RecurrentContainer(self.modules[1]:clone(...))
 end
 
 function Recurrent:share(m,...)
@@ -347,7 +347,7 @@ function Recurrent:__tostring__()
     local tab = '  '
     local line = '\n'
     local next = ' -> '
-    local str = 'nn.Recurrent {' .. line
+    local str = 'RecurrentContainer {' .. line
     str = str .. self.modules[1]:__tostring__() .. line .. '}'
     return str
 end
