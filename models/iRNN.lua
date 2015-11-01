@@ -1,5 +1,5 @@
 require 'nn'
-function iRNN(inputSize, hiddenSize, outputSize, n, dropout)
+function iRNN(inputSize, hiddenSize, n, dropout)
     local outputSize = outputSize or inputSize
     local linear = nn.Linear(inputSize+hiddenSize, hiddenSize)
     linear.weight:narrow(2,inputSize+1, hiddenSize):copy(torch.eye(hiddenSize))
@@ -11,7 +11,7 @@ function iRNN(inputSize, hiddenSize, outputSize, n, dropout)
     if dropout > 0 then
       rnn:add(nn.Dropout(dropout))
     end
-    rnn:add(nn.ConcatTable():add(nn.Sequential():add(nn.Linear(hiddenSize, outputSize)):add(nn.LogSoftMax())):add(nn.Identity()))
+    rnn:add(nn.ConcatTable():add(nn.Identity()):add(nn.Identity()))
     return {
       rnnModule = rnn,
       initState = torch.zeros(hiddenSize)
