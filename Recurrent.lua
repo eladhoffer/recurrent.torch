@@ -104,6 +104,10 @@ function Recurrent:setState(state, batchSize)
     end
 end
 
+function Recurrent:getState()
+    return self.state:clone()
+end
+
 function Recurrent:zeroGradState()
     self.gradState = nn.utils.recursiveResizeAs(self.gradState, self.state)
     nn.utils.recursiveFill(self.gradState, 0)
