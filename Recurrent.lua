@@ -163,7 +163,6 @@ function Recurrent:updateOutput(input)
             output[i] =  currentOutput[1]
             self.currentIteration = self.currentIteration + 1
         end
-        self.currentIteration = self.currentIteration - 1
 
         if torch.isTensor(input) then --join a table into a time tensor
             for i=1,#output do
@@ -185,10 +184,11 @@ end
 
 function Recurrent:updateGradInput(input, gradOutput)
     assert(self.train, "must be in training mode")
+    self.currentIteration = self.currentIteration - 1
+
     if not self.seqMode then
         self.gradInput = self.modules[self.currentIteration]:updateGradInput({input, self.state}, {gradOutput, self.gradState})[1]
         self.gradState = self.modules[self.currentIteration].gradInput[2]
-        self.currentIteration = self.currentIteration - 1
     else
         local currentIteration = self.currentIteration --to not disrupt accGradParameters
         local gradInput = {}
@@ -218,17 +218,17 @@ function Recurrent:updateGradInput(input, gradOutput)
         end
         self.gradInput = gradInput
     end
-    return self.gradInput
+    return self.gradInput, self.gradState
 end
 
 function Recurrent:accGradParameters(input, gradOutput, scale)
     assert(self.train, "must be in training mode")
-
     local scale = scale or 1
+    self.currentIteration = self.currentIteration - 1
+
     if not self.seqMode then
         self.modules[self.currentIteration]:accGradParameters({input, self.state}, {gradOutput, self.gradState}, scale)
         self.gradState = self.modules[self.currentIteration].gradInput[2]
-        self.currentIteration = self.currentIteration - 1
     else
         local __input = input
         if torch.isTensor(input) then --split a time tensor into table
@@ -254,15 +254,16 @@ end
 
 function Recurrent:backward(input, gradOutput, scale)
     assert(self.train, "must be in training mode")
+    self.currentIteration = self.currentIteration - 1
+
     if (torch.type(self.gradState) ~= 'table' and self.gradState:dim() == 0) then
         self:zeroGradState()
     end
 
     local scale = scale or 1
     if not self.seqMode then
-        self.gradInput = self.modules[self.currentIteration]:backward({input, self.state}, {gradOutput, self.gradState, scale})[1]
+        self.gradInput = self.modules[self.currentIteration]:backward({input, self.state}, {gradOutput, self.gradState}, scale)[1]
         self.gradState = self.modules[self.currentIteration].gradInput[2]
-        self.currentIteration = self.currentIteration - 1
     else
         local gradInput = {}
         local __input = input
