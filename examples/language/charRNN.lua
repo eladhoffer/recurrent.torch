@@ -19,8 +19,7 @@ cmd:option('-input',              'data/tinyshakespeare.txt',  'file with input 
 cmd:option('-shuffle',            false,                       'shuffle training samples')
 
 cmd:text('===>Model And Training Regime')
-cmd:option('-modelsFolder',       '../../models/',             'Models Folder')
-cmd:option('-model',              'LSTM',                      'Model file - must return a model bulider function')
+cmd:option('-model',              'LSTM',                      'Recurrent model [RNN, iRNN, LSTM, GRU]')
 cmd:option('-seqLength',          50,                          'number of timesteps to unroll for')
 cmd:option('-rnnSize',            128,                         'size of rnn hidden layer')
 cmd:option('-numLayers',          2,                           'number of layers in the LSTM')
@@ -56,7 +55,6 @@ cmd:option('-checkpoint',         0,                           'Save a weight ch
 
 
 opt = cmd:parse(arg or {})
-opt.model = opt.modelsFolder .. paths.basename(opt.model, '.lua')
 opt.save = paths.concat('./Results', opt.save)
 torch.setnumthreads(opt.threads)
 torch.manualSeed(opt.seed)
@@ -82,8 +80,18 @@ if paths.filep(opt.load) then
     modelConfig = torch.load(opt.load)
     print('==>Loaded Net from: ' .. opt.load)
 else
-    modelConfig = require(opt.model)(vocabSize, opt.rnnSize,  opt.numLayers, opt.dropout, opt.initWeight)
-    modelConfig.recurrent = nn.RecurrentContainer(modelConfig.rnnModule):sequence()
+    modelConfig = {}
+    local rnnTypes = {LSTM = nn.LSTM, RNN = nn.RNN, GRU = nn.GRU, iRNN = nn.iRNN}
+    local rnn = rnnTypes[opt.model]
+    local hiddenSize = vocabSize
+    modelConfig.recurrent = nn.Sequential()
+    for i=1, opt.numLayers do
+      modelConfig.recurrent:add(rnn(hiddenSize, opt.rnnSize, opt.initWeight, 0))
+      if opt.dropout > 0 then
+        modelConfig.recurrent:add(nn.Dropout(opt.dropout))
+      end
+      hiddenSize = opt.rnnSize
+    end
     modelConfig.embedder = nn.OneHot(vocabSize)
     modelConfig.classifier = nn.Linear(opt.rnnSize, vocabSize)
 end

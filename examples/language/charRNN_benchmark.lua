@@ -3,13 +3,14 @@ require 'nn'
 require 'optim'
 require 'eladtools'
 require 'recurrent'
+require 'utils.OneHot'
 require 'utils.textDataProvider'
 -------------------------------------------------------
 
 cmd = torch.CmdLine()
 cmd:addTime()
 cmd:text()
-cmd:text('Training recurrent networks on word-level text dataset - Penn Treebank')
+cmd:text('Training recurrent networks on character-level text dataset')
 cmd:text()
 cmd:text('==>Options')
 
@@ -17,23 +18,23 @@ cmd:text('===>Data Options')
 cmd:option('-shuffle',            false,                       'shuffle training samples')
 
 cmd:text('===>Model And Training Regime')
-cmd:option('-model',              'LSTM',                      'Recurrent model [RNN, iRNN, LSTM, GRU]')
+cmd:option('-modelsFolder',       '../../models/',             'Models Folder')
+cmd:option('-model',              'LSTM',                      'Model file - must return a model bulider function')
 cmd:option('-seqLength',          50,                          'number of timesteps to unroll for')
 cmd:option('-rnnSize',            128,                         'size of rnn hidden layer')
-cmd:option('-embeddingSize',      64,                          'size of word embedding')
 cmd:option('-numLayers',          2,                           'number of layers in the LSTM')
-cmd:option('-dropout',            0.5,                           'dropout p value')
+cmd:option('-dropout',            0,                           'dropout p value')
 cmd:option('-LR',                 2e-3,                        'learning rate')
 cmd:option('-LRDecay',            0,                           'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        0,                           'L2 penalty on the weights')
 cmd:option('-momentum',           0,                           'momentum')
 cmd:option('-batchSize',          50,                          'batch size')
-cmd:option('-decayRate',          2,                           'exponential decay rate')
+cmd:option('-decayRate',          1.03,                        'exponential decay rate')
 cmd:option('-initWeight',         0.08,                        'uniform weight initialization range')
 cmd:option('-earlyStop',          5,                           'number of bad epochs to stop after')
 cmd:option('-optimization',       'rmsprop',                   'optimization method')
 cmd:option('-gradClip',           5,                           'clip gradients at this value')
-cmd:option('-epoch',              100,                         'number of epochs to train')
+cmd:option('-epoch',              100,                          'number of epochs to train')
 cmd:option('-epochDecay',         5,                           'number of epochs to start decay learning rate')
 
 cmd:text('===>Platform Optimization')
@@ -54,51 +55,41 @@ cmd:option('-checkpoint',         0,                           'Save a weight ch
 
 
 opt = cmd:parse(arg or {})
+opt.model = opt.modelsFolder .. paths.basename(opt.model, '.lua')
 opt.save = paths.concat('./Results', opt.save)
 torch.setnumthreads(opt.threads)
 torch.manualSeed(opt.seed)
 torch.setdefaulttensortype('torch.FloatTensor')
 
 ----------------------------------------------------------------------
+-- data prep
 local trainWordVec, testWordVec, valWordVec, decoder, decoder_, vocab
-
-trainWordVec, vocab, decoder = loadTextFileWords('./data/ptb.train.txt')
-testWordVec, vocab, decoder_ = loadTextFileWords('./data/ptb.test.txt', vocab)
+trainWordVec, vocab, decoder = loadTextFileChars('./data/ptb.train.txt')
+testWordVec, vocab, decoder_ = loadTextFileChars('./data/ptb.test.txt', vocab)
 assert(#decoder == #decoder_) --no new words
-valWordVec, vocab, decoder_ = loadTextFileWords('./data/ptb.valid.txt', vocab)
+valWordVec, vocab, decoder_ = loadTextFileChars('./data/ptb.valid.txt', vocab)
 assert(#decoder == #decoder_) --no new words
+local vocabSize = #decoder
 data = {
   trainingData = trainWordVec,
   testData = testWordVec,
   validationData = valWordVec,
-  vocabSize = #decoder,
+  vocabSize = vocabSize,
   decoder = decoder,
   vocab = vocab,
-  decode = decodeFunc(vocab, 'word'),
-  encode = encodeFunc(vocab, 'word')
+  decode = decodeFunc(vocab, 'char'),
+  encode = encodeFunc(vocab, 'char')
 }
-local vocabSize = #decoder
 ----------------------------------------------------------------------
 
 if paths.filep(opt.load) then
     modelConfig = torch.load(opt.load)
     print('==>Loaded Net from: ' .. opt.load)
 else
-    modelConfig = {}
-    local rnnTypes = {LSTM = nn.LSTM, RNN = nn.RNN, GRU = nn.GRU, iRNN = nn.iRNN}
-    local rnn = rnnTypes[opt.model]
-    local hiddenSize = opt.embeddingSize
-    modelConfig.recurrent = nn.Sequential()
-    for i=1, opt.numLayers do
-      modelConfig.recurrent:add(rnn(hiddenSize, opt.rnnSize, opt.initWeight))
-      if opt.dropout > 0 then
-        modelConfig.recurrent:add(nn.Dropout(opt.dropout))
-      end
-      hiddenSize = opt.rnnSize
-    end
-    modelConfig.embedder = nn.LookupTable(vocabSize, opt.embeddingSize)
+    modelConfig = require(opt.model)(vocabSize, opt.rnnSize,  opt.numLayers, opt.dropout, opt.initWeight)
+    modelConfig.recurrent = nn.RecurrentContainer(modelConfig.rnnModule):sequence()
+    modelConfig.embedder = nn.OneHot(vocabSize)
     modelConfig.classifier = nn.Linear(opt.rnnSize, vocabSize)
-  --  modelConfig.classifier = nn.TemporalConvolution(opt.rnnSize, vocabSize, 1)
 end
 
 
@@ -115,27 +106,30 @@ local decreaseLR = EarlyStop(1,opt.epochDecay)
 local stopTraining = EarlyStop(opt.earlyStop, opt.epoch)
 local epoch = 1
 
+local logConst = 1/math.log(2)
 repeat
   print('\nEpoch ' .. epoch ..'\n')
-  LossTrain = train(data.trainingData)
+  LossTrain = train(data.trainingData) * logConst
   saveModel(epoch)
   if opt.optState then
     torch.save(optStateFilename .. '_epoch_' .. epoch .. '.t7', optimState)
   end
-  print('\nTraining Perplexity: ' .. torch.exp(LossTrain))
+  print('\nTraining BPC: ' .. LossTrain)
 
-  local LossVal = evaluate(data.validationData)
+  local LossVal = evaluate(data.validationData) * logConst
 
-  print('\nValidation Perplexity: ' .. torch.exp(LossVal))
+  print('\nValidation BPC: ' .. LossVal)
 
-  local LossTest = evaluate(data.testData)
+  local LossTest = evaluate(data.testData) * logConst
 
-  print('\nSampled Text:\n' .. sample('the meaning of life is', 50, true))
+  print('\nTest BPC: ' .. LossTest)
 
-  print('\nTest Perplexity: ' .. torch.exp(LossTest))
-  log:add{['Training Loss']= LossTrain, ['Validation Loss'] = LossVal, ['Test Loss'] = LossTest}
-  log:style{['Training Loss'] = '-', ['Validation Loss'] = '-', ['Test Loss'] = '-'}
+  log:add{['Training BPC']= LossTrain, ['Validation BPC'] = LossVal, ['Test BPC'] = LossTest}
+  log:style{['Training BPC'] = '-', ['Validation BPC'] = '-', ['Test BPC'] = '-'}
   log:plot()
+
+  print('\nSampled Text:\n' .. sample(nil, 400))
+
   epoch = epoch + 1
 
   if decreaseLR:update(LossVal) then

@@ -5,7 +5,6 @@ require 'recurrent'
 ----------------------------------------------------------------------
 -- Output files configuration
 os.execute('mkdir -p ' .. opt.save)
-os.execute('cp ' .. opt.model .. '.lua ' .. opt.save)
 
 cmd:log(opt.save .. '/log.txt', opt)
 local netFilename = paths.concat(opt.save, 'Net')
@@ -22,16 +21,12 @@ local recurrent = modelConfig.recurrent
 local stateSize = modelConfig.stateSize
 local embedder = modelConfig.embedder
 local classifier = modelConfig.classifier
-local initState = modelConfig.initState
 
 -- Model + Loss:
 local model = nn.Sequential()
 model:add(embedder)
 model:add(recurrent)
-model:add(nn.View(opt.batchSize * opt.seqLength, -1))
-model:add(classifier)
-model:add(nn.View(opt.batchSize, opt.seqLength, -1))
-
+model:add(nn.TemporalModule(classifier))
 local criterion = nn.CrossEntropyCriterion()--ClassNLLCriterion()
 
 
@@ -43,10 +38,11 @@ if opt.type =='cuda' then
     require 'cunn'
     cutorch.setDevice(opt.devid)
     cutorch.manualSeed(opt.seed)
+
     model:cuda()
+
     criterion = criterion:cuda()
     TensorType = 'torch.CudaTensor'
-    initState = nn.utils.recursiveType(initState, TensorType)
 
 
     ---Support for multiple GPUs - currently data parallel scheme
@@ -137,8 +133,8 @@ local function reshapeData(wordVec, seqLength, batchSize)
         batchWordVec:select(2,i):copy(wordVec:narrow(1, startPos, sliceLength))
     endIdxs:range(startPos + seqLength, endPos + 1, seqLength)
 endWords:select(2,i):copy(wordVec:index(1, endIdxs))
-    end
-    return batchWordVec, endWords
+  end
+  return batchWordVec, endWords
 end
 
 local function saveModel(epoch)
@@ -171,10 +167,8 @@ local function ForwardSeq(dataVec, train)
     applyRecurrent('sequence')
     applyRecurrent('forget')
 
-    -- the initial state of the cell/hidden states
-    applyRecurrent('setState', initState, opt.batchSize)
     for b=1, sizeData do
-        if opt.shuffle then --no dependancy between consecutive batches
+        if b==1 or opt.shuffle then --no dependancy between consecutive batches
             applyRecurrent('zeroState')
         end
         x:copy(data[b])
@@ -208,8 +202,6 @@ local function ForwardSingle(dataVec)
 
     -- input is from a single time step
     applyRecurrent('single')
-    -- the initial state of the cell/hidden states
-    applyRecurrent('setState', initState, 1)
 
     local x = torch.Tensor(1,1):type(TensorType)
     local y
@@ -257,8 +249,7 @@ local function sample(str, num, space, temperature)
 
 
     recurrent:evaluate()
-    recurrent:setState(initState, 1)
-    recurrent:single()
+    applyRecurrent('single')
     local sampleModel = nn.Sequential():add(embedder):add(recurrent):add(classifier):add(nn.SoftMax():type(TensorType))
 
     local pred, predText, embedded

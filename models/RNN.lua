@@ -1,19 +1,19 @@
 require 'nn'
-function RNN(inputSize, hiddenSize, n, dropout)
+local function RNN(inputSize, hiddenSize)
     local outputSize = outputSize or inputSize
     local linear = nn.Linear(inputSize+hiddenSize, hiddenSize)
     local rnn = nn.Sequential()
     rnn:add(nn.JoinTable(1,1))
     rnn:add(linear)
     rnn:add(nn.Sigmoid())
-    if dropout > 0 then
-      rnn:add(nn.Dropout(dropout))
-    end
     rnn:add(nn.ConcatTable():add(nn.Identity()):add(nn.Identity()))
     return {
       rnnModule = rnn,
-      initState = torch.zeros(hiddenSize)
+      initState = torch.zeros(1, hiddenSize),
+      name = 'RNN: ' .. inputSize .. ' -> ' .. outputSize .. ', ' .. outputSize
     }
 
 end
+
+recurrent.rnnModules['RNN'] = RNN
 return RNN

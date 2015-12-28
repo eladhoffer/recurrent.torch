@@ -13,7 +13,7 @@ local function viewTimeAsBatch(input)
     local szInput = input:size():totable()
     szInput[2] = szInput[1]*szInput[2]
     table.remove(szInput, 1)
-    return input:view(torch.LongStorage(szInput))
+    return input:view(unpack(szInput))
 end
 function TemporalCriterion:updateOutput(input, target)
     if self.evalAsBatch then

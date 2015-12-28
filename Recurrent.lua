@@ -17,29 +17,50 @@ local function recursiveCopy(t1, t2)
     return t1, t2
 end
 
-local function recursiveBatchExpand(t, batchSize)
-    if torch.type(t) == 'table' then
-        for key,_ in pairs(t) do
-            t[key] = recursiveBatchExpand(t[key], batchSize)
+local function recursiveBatchExpand(t1, t2, batchSize)
+    if torch.type(t2) == 'table' then
+        t1 = (torch.type(t1) == 'table') and t1 or {t1}
+        for key,_ in pairs(t2) do
+            t1[key], t2[key] = recursiveBatchExpand(t1[key], t2[key], batchSize)
         end
-    elseif torch.isTensor(t) then
-        local sz = t:size():totable()
-        t:resize(batchSize, unpack(sz))
-        t:copy(t:view(1, unpack(sz)):expandAs(t))
+    elseif torch.isTensor(t2) then
+        t1 = torch.isTensor(t1) and t1 or t2.new()
+        local sz = t2:size()
+        sz[1] = batchSize
+        t1:resize(sz)
+        t1:copy(t2:expandAs(t1))
     else
         error("expecting nested tensors or tables. Got "..
-        torch.type(t).. "instead")
+        torch.type(t1).." and "..torch.type(t2).." instead")
+    end
+    return t1, t2
+end
+
+
+local function recursiveBatchResize(t, batchSize)
+    if torch.type(t) == 'table' then
+        for key,_ in pairs(t) do
+            t[key] = recursiveBatchResize(t, batchSize, dims)
+        end
+    elseif torch.isTensor(t) then
+        local sz = t:size()
+        if sz[1] ~= batchSize then
+            sz[1] = batchSize
+            t:resize(sz)
+            t:zero() --initialize values to zero
+        end
+    else
+        error("expecting nested tensors or tables. Got "..
+        torch.type(t).." instead")
     end
     return t
 end
 
 
-
 function Recurrent:__init(recurrentModule)
     parent.__init(self)
+    local recurrentModule = recurrentModule or nn.Sequential()
     self.modules = {}
-    self.gradInput = self.modules[1].gradInput
-    self.output = self.modules[1].output
     self.state = torch.Tensor()
     self.gradState = torch.Tensor()
     self.initState = torch.Tensor()
@@ -47,8 +68,7 @@ function Recurrent:__init(recurrentModule)
     self.splitInput = nn.SplitTable(self.timeDimension)
     self.joinOutput = nn.JoinTable(self.timeDimension)
     self.currentIteration = 1
-    self.seqMode = true
-    self.dimSize = 1
+    self.seqMode = false
 
     self:add(recurrentModule)
 end
@@ -67,6 +87,7 @@ function Recurrent:sequence()
     return self:setMode('sequence')
 end
 
+
 function Recurrent:setIterations(iterations, clear)
     local start = 2
     if clear then
@@ -81,14 +102,17 @@ end
 
 function Recurrent:add(m)
     if torch.type(m) =='table' and (m.rnnModule) and (m.initState) then
-     self:setState(m.initState)
-     m = m.rnnModule
+        self:setState(m.initState)
+        self.name = m.name
+        m = m.rnnModule
     end
     if self.modules[1] then
-      self.modules[1]:add(m)
+        self.modules[1]:add(m)
     else
-      self.modules[1] = m
+        self.modules[1] = m
     end
+    self.gradInput = self.modules[1].gradInput
+    self.output = self.modules[1].output
     self:setIterations(#self.modules, true)
     return self
 end
@@ -104,12 +128,20 @@ function Recurrent:remove(m,i)
 end
 
 
-function Recurrent:setState(state)
-    self.state = recursiveCopy(self.state, state)
+function Recurrent:setState(state, batchSize)
+    if batchSize then
+        self.state = recursiveBatchExpand(self.state, state, batchSize)
+    else
+        self.state = recursiveCopy(self.state, state)
+    end
 end
 
 function Recurrent:getState()
     return self.state
+end
+
+function Recurrent:resizeStateBatch(batchSize)
+    self.state = recursiveBatchResize(self.state, batchSize)
 end
 
 function Recurrent:setGradState(gradState)
@@ -125,10 +157,7 @@ function Recurrent:zeroGradState()
     nn.utils.recursiveFill(self.gradState, 0)
 end
 
-function Recurrent:zeroState(...) --optional: specify size
-    if ... then
-        self.state:resize(...)
-    end
+function Recurrent:zeroState()
     nn.utils.recursiveFill(self.state, 0)
     self:zeroGradState()
 end
@@ -155,7 +184,7 @@ function Recurrent:updateOutput(input)
         if self.currentIteration > #self.modules then
             self:setIterations(self.currentIteration)
         end
-        self.state = recursiveBatchExpand(self.state, input:size(1)) --expand to batchSize
+        self:resizeStateBatch(input:size(1))
         currentOutput = self.modules[self.currentIteration]:forward({input, self.state})
         self.output = currentOutput[1]
         if self.train then
@@ -167,7 +196,8 @@ function Recurrent:updateOutput(input)
         if torch.isTensor(input) then --split a time tensor into table
             __input = self.splitInput:forward(input)
         end
-        self.state = recursiveBatchExpand(self.state, __input:size(1)) --expand to batchSize
+
+        self:resizeStateBatch(__input[1]:size(1))
         currentOutput = {__input[1], self.state}
 
         if #__input + self.currentIteration - 1 > #self.modules then
@@ -325,7 +355,7 @@ function Recurrent:clone(...)
 end
 
 function Recurrent:share(m,...)
-    self.modules[1]:share(m,...)
+    return self.modules[1]:share(m.modules[1],...)
 end
 
 
@@ -344,15 +374,15 @@ function Recurrent:shareWeights()
 end
 
 function Recurrent:training()
-  parent.training(self)
-  self:forget()
-  return self
+    parent.training(self)
+    self:forget()
+    return self
 end
 
 function Recurrent:evaluate()
-  parent.evaluate(self)
-  self:forget()
-  return self
+    parent.evaluate(self)
+    self:forget()
+    return self
 end
 
 function Recurrent:type(t)
@@ -365,7 +395,5 @@ function Recurrent:__tostring__()
     local tab = '  '
     local line = '\n'
     local next = ' -> '
-    local str = 'nn.RecurrentContainer {' .. line
-    str = str .. self.modules[1]:__tostring__() .. line .. '}'
-    return str
+    return self.name or 'nn.RecurrentContainer {' .. line .. self.modules[1]:__tostring__() .. line .. '}'
 end
