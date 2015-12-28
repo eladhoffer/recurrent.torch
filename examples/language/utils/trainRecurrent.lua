@@ -104,17 +104,7 @@ local optimizer = Optimizer{
 
 ----------------------------------------------------------------------
 ---utility functions
-local function applyRecurrent(func, ...)
-    for i, rnn in pairs(model:findModules('nn.RecurrentContainer')) do
-        if opt.nGPU > 1 then
-            cutorch.setDevice(i)
-        end
-        rnn[func](rnn, ...)
-    end
-    if opt.nGPU > 1 then
-        cutorch.setDevice(opt.devid)
-    end
-end
+
 
 local function reshapeData(wordVec, seqLength, batchSize)
     local offset = offset or 0
@@ -164,12 +154,12 @@ local function ForwardSeq(dataVec, train)
     local yt = torch.Tensor(opt.batchSize, opt.seqLength):type(TensorType)
 
     -- input is a sequence
-    applyRecurrent('sequence')
-    applyRecurrent('forget')
+    model:sequence()
+    model:forget()
 
     for b=1, sizeData do
         if b==1 or opt.shuffle then --no dependancy between consecutive batches
-            applyRecurrent('zeroState')
+            model:zeroState()
         end
         x:copy(data[b])
         yt:narrow(2,1,opt.seqLength-1):copy(x:narrow(2,2,opt.seqLength-1))
@@ -201,7 +191,7 @@ local function ForwardSingle(dataVec)
     local currLoss = 0
 
     -- input is from a single time step
-    applyRecurrent('single')
+    model:single()
 
     local x = torch.Tensor(1,1):type(TensorType)
     local y
@@ -249,7 +239,8 @@ local function sample(str, num, space, temperature)
 
 
     recurrent:evaluate()
-    applyRecurrent('single')
+    recurrent:single()
+
     local sampleModel = nn.Sequential():add(embedder):add(recurrent):add(classifier):add(nn.SoftMax():type(TensorType))
 
     local pred, predText, embedded
