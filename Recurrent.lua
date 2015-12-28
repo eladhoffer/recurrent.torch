@@ -17,30 +17,27 @@ local function recursiveCopy(t1, t2)
     return t1, t2
 end
 
-local function recursiveBatchExpand(t1, t2, batchSize)
-    if torch.type(t2) == 'table' then
-        t1 = (torch.type(t1) == 'table') and t1 or {t1}
-        for key,_ in pairs(t2) do
-            t1[key], t2[key] = recursiveBatchExpand(t1[key], t2[key], batchSize)
+local function recursiveBatchExpand(t, batchSize)
+    if torch.type(t) == 'table' then
+        for key,_ in pairs(t) do
+            t[key] = recursiveBatchExpand(t[key], batchSize)
         end
-    elseif torch.isTensor(t2) then
-        t1 = torch.isTensor(t1) and t1 or t2.new()
-        local sz = t2:size():totable()
-        t1:resize(batchSize, unpack(sz))
-        t1:copy(t2:view(1, unpack(sz)):expandAs(t1))
+    elseif torch.isTensor(t) then
+        local sz = t:size():totable()
+        t:resize(batchSize, unpack(sz))
+        t:copy(t:view(1, unpack(sz)):expandAs(t))
     else
         error("expecting nested tensors or tables. Got "..
-        torch.type(t1).." and "..torch.type(t2).." instead")
+        torch.type(t).. "instead")
     end
-    return t1, t2
+    return t
 end
 
 
 
 function Recurrent:__init(recurrentModule)
     parent.__init(self)
-    local recurrentModule = recurrentModule or nn.Sequential()
-    self.modules = {recurrentModule}
+    self.modules = {}
     self.gradInput = self.modules[1].gradInput
     self.output = self.modules[1].output
     self.state = torch.Tensor()
@@ -51,6 +48,9 @@ function Recurrent:__init(recurrentModule)
     self.joinOutput = nn.JoinTable(self.timeDimension)
     self.currentIteration = 1
     self.seqMode = true
+    self.dimSize = 1
+
+    self:add(recurrentModule)
 end
 
 function Recurrent:setMode(mode) --mode can be 'sequence' or 'single'
@@ -80,7 +80,15 @@ function Recurrent:setIterations(iterations, clear)
 end
 
 function Recurrent:add(m)
-    self.modules[1]:add(m)
+    if torch.type(m) =='table' and (m.rnnModule) and (m.initState) then
+     self:setState(m.initState)
+     m = m.rnnModule
+    end
+    if self.modules[1] then
+      self.modules[1]:add(m)
+    else
+      self.modules[1] = m
+    end
     self:setIterations(#self.modules, true)
     return self
 end
@@ -96,16 +104,20 @@ function Recurrent:remove(m,i)
 end
 
 
-function Recurrent:setState(state, batchSize)
-    if batchSize then
-        self.state = recursiveBatchExpand(self.state, state, batchSize)
-    else
-        self.state = recursiveCopy(self.state, state)
-    end
+function Recurrent:setState(state)
+    self.state = recursiveCopy(self.state, state)
 end
 
 function Recurrent:getState()
-    return self.state:clone()
+    return self.state
+end
+
+function Recurrent:setGradState(gradState)
+    self.gradState = recursiveCopy(self.gradState, gradState)
+end
+
+function Recurrent:getGradState()
+    return self.gradState
 end
 
 function Recurrent:zeroGradState()
@@ -143,6 +155,7 @@ function Recurrent:updateOutput(input)
         if self.currentIteration > #self.modules then
             self:setIterations(self.currentIteration)
         end
+        self.state = recursiveBatchExpand(self.state, input:size(1)) --expand to batchSize
         currentOutput = self.modules[self.currentIteration]:forward({input, self.state})
         self.output = currentOutput[1]
         if self.train then
@@ -154,7 +167,7 @@ function Recurrent:updateOutput(input)
         if torch.isTensor(input) then --split a time tensor into table
             __input = self.splitInput:forward(input)
         end
-
+        self.state = recursiveBatchExpand(self.state, __input:size(1)) --expand to batchSize
         currentOutput = {__input[1], self.state}
 
         if #__input + self.currentIteration - 1 > #self.modules then
