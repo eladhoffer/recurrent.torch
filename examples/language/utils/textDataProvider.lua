@@ -28,7 +28,7 @@ function loadTextFileWords(filename, vocab)
     return wordsVec, vocab, decoder
 end
 
-function loadTextFileChars(filename)
+function loadTextFileChars(filename, vocab)
   local file = torch.DiskFile(filename, 'r')
   file:seekEnd()
   local length = file:position() - 1
@@ -36,7 +36,7 @@ function loadTextFileChars(filename)
   local byteVec = torch.ByteTensor(length)
   file:readByte(byteVec:storage())
 
-  local vocab = {}
+  local vocab = vocab or {}
   local currentNum = 1
   local data = byteVec:data()
   for i=0, length-1 do

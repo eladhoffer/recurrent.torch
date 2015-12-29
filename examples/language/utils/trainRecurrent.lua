@@ -29,7 +29,6 @@ model:add(recurrent)
 model:add(nn.TemporalModule(classifier))
 local criterion = nn.CrossEntropyCriterion()--ClassNLLCriterion()
 
-
 local TensorType = 'torch.FloatTensor'
 
 
