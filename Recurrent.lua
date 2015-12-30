@@ -92,7 +92,7 @@ function Recurrent:setGradState(gradState)
 end
 
 function Recurrent:accGradState(gradState)
-    self.gradState = recurrent.utils.recursiveAdd(self.gradState, gradState)
+    self.gradState = nn.utils.recursiveAdd(self.gradState, gradState)
 end
 
 function Recurrent:getGradState()

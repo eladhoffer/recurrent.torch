@@ -17,19 +17,6 @@ local function recursiveCopy(t1, t2)
     return t1, t2
 end
 
-local function recursiveAdd(t1, t2)
-    if torch.type(t2) == 'table' then
-        for key,_ in pairs(t2) do
-            t1[key], t2[key] = recursiveAdd(t1[key], t2[key])
-        end
-    elseif torch.isTensor(t2) then
-        t1:add(t2)
-    else
-        error("expecting nested tensors or tables. Got "..
-        torch.type(t1).." and "..torch.type(t2).." instead")
-    end
-    return t1, t2
-end
 
 local function recursiveBatchExpand(t1, t2, batchSize)
     if torch.type(t2) == 'table' then
@@ -76,4 +63,3 @@ end
 recurrent.utils.recursiveBatchResize = recursiveBatchResize
 recurrent.utils.recursiveBatchExpand = recursiveBatchExpand
 recurrent.utils.recursiveCopy = recursiveCopy
-recurrent.utils.recursiveAdd = recursiveAdd

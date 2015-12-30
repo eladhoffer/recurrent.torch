@@ -59,7 +59,7 @@ if opt.type =='cuda' then
 end
 
 --sequential criterion
-local seqCriterion = nn.TemporalCriterion(criterion, true)
+local seqCriterion = nn.TemporalCriterion(criterion)
 
 -- Optimization configuration
 local Weights,Gradients = model:getParameters()

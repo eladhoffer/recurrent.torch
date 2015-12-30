@@ -56,7 +56,7 @@ end
 
 function Container:accGradState(sourceState)
     local targetState = self:getGradState()
-    recurrent.utils.recursiveAdd(targetState, sourceState)
+    nn.utils.recursiveAdd(targetState, sourceState)
 end
 --
 --function Container:shareGradState(container)
