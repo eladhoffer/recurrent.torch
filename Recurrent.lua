@@ -2,8 +2,7 @@ local Recurrent, parent = torch.class('nn.RecurrentContainer', 'nn.Container')
 
 function Recurrent:__init(recurrentModule)
     parent.__init(self)
-    local recurrentModule = recurrentModule or nn.Sequential()
-    self.modules = {}
+    self.modules = {nn.Sequential()}
     self.state = torch.Tensor()
     self.gradState = torch.Tensor()
     self.initState = torch.Tensor()
@@ -13,7 +12,9 @@ function Recurrent:__init(recurrentModule)
     self.currentIteration = 1
     self.seqMode = false
 
-    self:add(recurrentModule)
+    if recurrentModule then
+      self:add(recurrentModule)
+    end
 end
 
 function Recurrent:setMode(mode) --mode can be 'sequence' or 'single'
@@ -43,17 +44,17 @@ function Recurrent:setIterations(iterations, clear)
     end
 end
 
-function Recurrent:add(m)
+function Recurrent:add(m, forwardStateModule)
     if torch.type(m) =='table' and (m.rnnModule) and (m.initState) then
         self:setState(m.initState)
         self.name = m.name
         m = m.rnnModule
+    elseif forwardStateModule then --will forward the state as is (useful for output projection)
+        self.name = self.name .. ' -> ' .. m:__tostring__()
+        m = nn.ParallelTable():add(m):add(nn.Identity())
     end
-    if self.modules[1] then
-        self.modules[1]:add(m)
-    else
-        self.modules[1] = m
-    end
+
+    self.modules[1]:add(m)
     self.gradInput = self.modules[1].gradInput
     self.output = self.modules[1].output
     self:setIterations(#self.modules, true)

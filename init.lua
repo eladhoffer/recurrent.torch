@@ -10,6 +10,7 @@ torch.include('recurrent', 'TemporalCriterion.lua')
 
 torch.include('recurrent', 'GRU.lua')
 torch.include('recurrent', 'LSTM.lua')
+torch.include('recurrent', 'MultiLayerLSTM.lua')
 torch.include('recurrent', 'RNN.lua')
 torch.include('recurrent', 'iRNN.lua')
 
