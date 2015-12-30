@@ -50,7 +50,7 @@ function Recurrent:add(m, forwardStateModule)
         self.name = m.name
         m = m.rnnModule
     elseif forwardStateModule then --will forward the state as is (useful for output projection)
-        self.name = self.name .. ' -> ' .. m:__tostring__()
+        self.name = (self.name) and self.name .. ' -> ' .. m:__tostring__()
         m = nn.ParallelTable():add(m):add(nn.Identity())
     end
 

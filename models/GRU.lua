@@ -45,7 +45,7 @@ local function GRU(inputSize, outputSize, initWeights, forgetBias)
     return {
         rnnModule = rnnModule,
         initState = torch.zeros(1, outputSize),
-        name = 'GRU: ' .. inputSize .. ' -> ' .. outputSize .. ', ' .. outputSize
+        name = 'nn.GRU(' .. inputSize .. ' -> ' .. outputSize .. ', ' .. outputSize .. ')'
     }
 end
 

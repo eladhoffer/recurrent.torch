@@ -56,7 +56,7 @@ local function LSTM(inputSize, outputSize, initWeights, forgetBias)
     return {
         rnnModule = model,
         initState = torch.zeros(1, 2 * outputSize),
-        name = 'LSTM: ' .. inputSize .. ' -> ' .. outputSize .. ', ' .. 2 * outputSize
+        name = 'nn.LSTM(' .. inputSize .. ' -> ' .. outputSize .. ', ' .. 2 * outputSize .. ')'
     }
 end
 

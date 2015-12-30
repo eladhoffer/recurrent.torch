@@ -10,7 +10,7 @@ local function RNN(inputSize, hiddenSize)
     return {
       rnnModule = rnn,
       initState = torch.zeros(1, hiddenSize),
-      name = 'RNN: ' .. inputSize .. ' -> ' .. outputSize .. ', ' .. outputSize
+      name = 'nn.RNN(' .. inputSize .. ' -> ' .. outputSize .. ', ' .. outputSize .. ')'
     }
 
 end

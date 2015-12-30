@@ -83,7 +83,7 @@ local function MultiLayerLSTM(inputSize, hiddenSize, n, dropout, initWeights, fo
   return {
     rnnModule = model,
     initState = torch.zeros(1, 2 * n * hiddenSize),
-    name = 'MultiLayerLSTM: ' .. inputSize .. ' -> ' .. outputSize .. ', ' .. 2 * n * outputSize
+    name = 'nn.MultiLayerLSTM(' .. inputSize .. ' -> ' .. outputSize .. ', ' .. 2 * n * outputSize .. ')'
   }
 end
 
