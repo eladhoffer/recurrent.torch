@@ -85,6 +85,7 @@ function Recurrent:getState()
 end
 
 function Recurrent:resizeStateBatch(batchSize)
+    self.initState = recurrent.utils.recursiveBatchResize(self.initState, batchSize)
     self.state = recurrent.utils.recursiveBatchResize(self.state, batchSize)
 end
 

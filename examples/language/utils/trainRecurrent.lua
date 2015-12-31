@@ -64,6 +64,9 @@ local seqCriterion = nn.TemporalCriterion(criterion)
 -- Optimization configuration
 local Weights,Gradients = model:getParameters()
 
+--initialize weights uniformly
+Weights:uniform(-opt.initWeight, opt.initWeight)
+
 local savedModel = {
     embedder = embedder:clone('weight','bias', 'running_mean', 'running_std'),
     recurrent = recurrent:clone('weight','bias', 'running_mean', 'running_std'),

@@ -1,7 +1,6 @@
 require 'nn'
-local function RNN(inputSize, hiddenSize)
-    local outputSize = outputSize or inputSize
-    local linear = nn.Linear(inputSize+hiddenSize, hiddenSize)
+local function RNN(inputSize, outputSize)
+    local linear = nn.Linear(inputSize + outputSize, outputSize)
     local rnn = nn.Sequential()
     rnn:add(nn.JoinTable(1,1))
     rnn:add(linear)
@@ -9,7 +8,7 @@ local function RNN(inputSize, hiddenSize)
     rnn:add(nn.ConcatTable():add(nn.Identity()):add(nn.Identity()))
     return {
       rnnModule = rnn,
-      initState = torch.zeros(1, hiddenSize),
+      initState = torch.zeros(1, outputSize),
       name = 'nn.RNN(' .. inputSize .. ' -> ' .. outputSize .. ', ' .. outputSize .. ')'
     }
 

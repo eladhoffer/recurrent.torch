@@ -2,7 +2,6 @@ require 'nngraph'
 --adapted from: https://github.com/karpathy/char-rnn
 local function LSTM(inputSize, outputSize, initWeights, forgetBias)
     local initWeights = initWeights or 0.08
-    local forgetBias = forgetBias or 1
     -- there will be 2 input: {input, state}
     -- where state is concatenated
     local input = nn.Identity()()
@@ -50,8 +49,10 @@ local function LSTM(inputSize, outputSize, initWeights, forgetBias)
         end
     end
     )
-    i2h.data.module.bias:narrow(1, outputSize+1, outputSize):fill(forgetBias)
-    h2h.data.module.bias:narrow(1, outputSize+1, outputSize):fill(forgetBias)
+    if forgetBias then
+      i2h.data.module.bias:narrow(1, outputSize+1, outputSize):fill(forgetBias)
+      h2h.data.module.bias:narrow(1, outputSize+1, outputSize):fill(forgetBias)
+    end
 
     return {
         rnnModule = model,
