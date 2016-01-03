@@ -116,8 +116,6 @@ function Recurrent:forget(release)
     self:setIterations(1, release)
 end
 
-
-
 function Recurrent:updateOutput(input)
     assert(torch.type(self.state) == 'table' or self.state:dim()>0, "State must be initialized")
     if not self.train then
@@ -170,9 +168,7 @@ function Recurrent:updateOutput(input)
         self.output = output
     end
 
-    self.state = recurrent.utils.recursiveCopy(self.state, currentOutput[2])
-
-
+    self.state = currentOutput[2]
     self:zeroGradState()
 
     return self.output, self.state
@@ -300,15 +296,20 @@ function Recurrent:updateParameters(learningRate)
 end
 
 function Recurrent:clone(...)
-    return nn.RecurrentContainer(self.modules[1]:clone(...))
+    local m = nn.RecurrentContainer(self.modules[1]:clone(...))
+    m:setState(self:getState())
+    m:setGradState(self:getGradState())
+    m.name = self.name
+    return m
 end
 
 function Recurrent:share(m,...)
     return self.modules[1]:share(m.modules[1],...)
 end
 
-
 function Recurrent:reset(stdv)
+    self:zeroState()
+    self:zeroGradState()
     self.modules[1]:reset(stdv)
 end
 

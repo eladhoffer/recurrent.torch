@@ -19,9 +19,6 @@ for name, func in pairs(recurrent.rnnModules) do
   nn[name] = function(...) return nn.RecurrentContainer(func(...)) end
 end
 
-
-
-
 -------Adding recurrent function to nn.Container---------------
 local Container = nn.Container
 function Container:applyRecurrent(func, ...)
@@ -41,7 +38,7 @@ local containerAddfunctions = {
 
 for _,fname in pairs(containerAddfunctions) do
   Container[fname] = function(self, ...)
-    return self:applyRecurrent(fname)
+    return self:applyRecurrent(fname, ...)
   end
 end
 
