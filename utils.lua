@@ -7,7 +7,7 @@ local function recursiveCopy(t1, t2)
             t1[key], t2[key] = recursiveCopy(t1[key], t2[key])
         end
     elseif torch.isTensor(t2) then
-        t1 = torch.isTensor(t1) and t1 or t2.new()
+        t1 = torch.isTensor(t1) and t1:typeAs(t2) or t2.new()
         t1:resizeAs(t2)
         t1:copy(t2)
     else
