@@ -6,15 +6,19 @@ function Recurrent:__init(recurrentModule)
     self.state = torch.Tensor()
     self.gradState = torch.Tensor()
     self.initState = torch.Tensor()
-    self.timeDimension = 2
-    self.splitInput = nn.SplitTable(self.timeDimension)
-    self.joinOutput = nn.JoinTable(self.timeDimension)
     self.currentIteration = 1
     self.seqMode = false
-
+    self:setTimeDim(2)
     if recurrentModule then
       self:add(recurrentModule)
     end
+end
+
+function Recurrent:setTimeDim(timeDim) --mode can be 'sequence' or 'single'
+    self.timeDimension = timeDim
+    self.splitInput = nn.SplitTable(self.timeDimension)
+    self.joinOutput = nn.JoinTable(self.timeDimension)
+    return self
 end
 
 function Recurrent:setMode(mode) --mode can be 'sequence' or 'single'
