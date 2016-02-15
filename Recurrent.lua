@@ -44,7 +44,7 @@ function Recurrent:setIterations(iterations, clear)
         start = #self.modules + 1
     end
     for i=start, iterations do
-        self.modules[i] = self.modules[1]:clone('weight','bias','gradWeight','gradBias','running_mean','running_std')
+        self.modules[i] = self.modules[1]:clone('weight','bias','gradWeight','gradBias','running_mean','running_std', 'running_var')
     end
 end
 
@@ -120,27 +120,29 @@ function Recurrent:forget(release)
     self:setIterations(1, release)
 end
 
+function Recurrent:__updateOneTimeStep(input)
+  if self.currentIteration == 1 then
+      self.initState = recurrent.utils.recursiveCopy(self.initState, self.state)
+  end
+  if self.currentIteration > #self.modules then
+      self:setIterations(self.currentIteration)
+  end
+  self:resizeStateBatch(input:size(1))
+  currentOutput = self.modules[self.currentIteration]:forward({input, self.state})
+  self.currentIteration = self.currentIteration + 1
+  return currentOutput[1], currentOutput[2]
+end
+
 function Recurrent:updateOutput(input)
     assert(torch.type(self.state) == 'table' or self.state:dim()>0, "State must be initialized")
     if not self.train then
         self:forget()
     end
-    if self.currentIteration == 1 then
-        self.initState = recurrent.utils.recursiveCopy(self.initState, self.state)
-    end
 
     local currentOutput
 
     if not self.seqMode then
-        if self.currentIteration > #self.modules then
-            self:setIterations(self.currentIteration)
-        end
-        self:resizeStateBatch(input:size(1))
-        currentOutput = self.modules[self.currentIteration]:forward({input, self.state})
-        self.output = currentOutput[1]
-        if self.train then
-            self.currentIteration = self.currentIteration + 1
-        end
+        self.output, self.state = self:__updateOneTimeStep(input)
     else --sequence mode
         local output = {}
         local __input = input
@@ -148,18 +150,12 @@ function Recurrent:updateOutput(input)
             __input = self.splitInput:forward(input)
         end
 
-        self:resizeStateBatch(__input[1]:size(1))
-        currentOutput = {__input[1], self.state}
-
         if #__input + self.currentIteration - 1 > #self.modules then
             self:setIterations(#__input + self.currentIteration - 1)
         end
 
         for i=1,#__input do
-            local nextInput = {__input[i], currentOutput[2]}
-            currentOutput = self.modules[self.currentIteration]:updateOutput(nextInput)
-            output[i] =  currentOutput[1]
-            self.currentIteration = self.currentIteration + 1
+            output[i], self.state = self:__updateOneTimeStep(__input[i])
         end
 
         if torch.isTensor(input) then --join a table into a time tensor
@@ -168,98 +164,38 @@ function Recurrent:updateOutput(input)
             end
             output = self.joinOutput:forward(output)
         end
-
         self.output = output
     end
 
-    self.state = currentOutput[2]
     self:zeroGradState()
 
     return self.output, self.state
 end
 
-function Recurrent:updateGradInput(input, gradOutput)
-    assert(self.train, "must be in training mode")
-    self.currentIteration = self.currentIteration - 1
 
-    if not self.seqMode then
-        self.gradInput = self.modules[self.currentIteration]:updateGradInput({input, self.state}, {gradOutput, self.gradState})[1]
-        self.gradState = self.modules[self.currentIteration].gradInput[2]
-    else
-        local currentIteration = self.currentIteration --to not disrupt accGradParameters
-        local gradInput = {}
-        local __input = input
-        if torch.isTensor(input) then --split a time tensor into table
-            __input = self.splitInput:forward(input)
-            gradOutput = gradOutput:split(1, self.timeDimension)
-        end
 
-        local currentModule = self.modules[self.currentIteration]
-        local currentGradState = self.gradState
-        for i=#__input-1,1,-1 do
-            currentIteration = currentIteration - 1
-            local previousModule = self.modules[currentIteration]
-            local previousState = previousModule.output[2]
-            currentModule.gradInput = currentModule:updateGradInput({__input[i+1], previousState}, {gradOutput[i+1], currentGradState}, scale)
-            gradInput[i+1] = currentModule.gradInput[1]
-            currentGradState = currentModule.gradInput[2]
-            currentModule = previousModule
-        end
-        currentModule.gradInput = currentModule:updateGradInput({__input[1], self.initState}, {gradOutput[1], currentGradState}, scale)
-        gradInput[1] = currentModule.gradInput[1]
-        self.gradState = currentModule.gradInput[2]
+function Recurrent:__backwardOneStep(input, gradOutput, scale)
+  self.currentIteration = self.currentIteration - 1
+  local currentModule = self.modules[self.currentIteration]
+  local previousState = self.initState
 
-        if torch.isTensor(input) then --join a table into a time tensor
-            gradInput = self.splitInput:backward(input, gradInput)
-        end
-        self.gradInput = gradInput
-    end
-    return self.gradInput, self.gradState
-end
+  if self.currentIteration > 1 then
+    previousState = self.modules[self.currentIteration - 1].output[2]
+  end
+  currentModule:backward({input, previousState}, {gradOutput, self.gradState}, scale)
 
-function Recurrent:accGradParameters(input, gradOutput, scale)
-    assert(self.train, "must be in training mode")
-    local scale = scale or 1
-    self.currentIteration = self.currentIteration - 1
-
-    if not self.seqMode then
-        self.modules[self.currentIteration]:accGradParameters({input, self.state}, {gradOutput, self.gradState}, scale)
-        self.gradState = self.modules[self.currentIteration].gradInput[2]
-    else
-        local __input = input
-        if torch.isTensor(input) then --split a time tensor into table
-            __input = self.splitInput:forward(input)
-            gradOutput = gradOutput:split(1, self.timeDimension)
-        end
-
-        local currentGradOutput = {gradOutput[#input], self.gradState}
-        local currentModule = self.modules[self.currentIteration]
-        local currentGradState = self.gradState
-        for i=#__input-1,1,-1 do
-            self.currentIteration = self.currentIteration - 1
-            local previousModule = self.modules[self.currentIteration]
-            local previousState = previousModule.output[2]
-            currentModule:accGradParameters({__input[i], previousState}, {gradOutput[i+1], currentGradState}, scale)
-            currentGradState = currentModule.gradInput[2]
-            currentModule = previousModule
-        end
-        currentModule:accGradParameters({__input[1], self.initState}, {gradOutput[1], currentGradState}, scale)
-        self.gradState = currentModule.gradInput[2]
-    end
+  return currentModule.gradInput[1], currentModule.gradInput[2]
 end
 
 function Recurrent:backward(input, gradOutput, scale)
     assert(self.train, "must be in training mode")
-    self.currentIteration = self.currentIteration - 1
-
     if (torch.type(self.gradState) ~= 'table' and self.gradState:dim() == 0) then
         self:zeroGradState()
     end
 
     local scale = scale or 1
     if not self.seqMode then
-        self.gradInput = self.modules[self.currentIteration]:backward({input, self.state}, {gradOutput, self.gradState}, scale)[1]
-        self.gradState = self.modules[self.currentIteration].gradInput[2]
+        self.gradInput, self.gradState = self:__backwardOneStep(input, gradOutput, scale)
     else
         local gradInput = {}
         local __input = input
@@ -268,20 +204,9 @@ function Recurrent:backward(input, gradOutput, scale)
             gradOutput = gradOutput:split(1, self.timeDimension)
         end
 
-        local currentModule = self.modules[self.currentIteration]
-        local currentGradState = self.gradState
-        for i=#__input-1,1,-1 do
-            self.currentIteration = self.currentIteration - 1
-            local previousModule = self.modules[self.currentIteration]
-            local previousState = previousModule.output[2]
-            currentModule.gradInput = currentModule:backward({__input[i+1], previousState}, {gradOutput[i+1], currentGradState}, scale)
-            gradInput[i+1] = currentModule.gradInput[1]
-            currentGradState = currentModule.gradInput[2]
-            currentModule = previousModule
+        for i=#__input,1,-1 do
+            gradInput[i], self.gradState = self:__backwardOneStep(__input[i], gradOutput[i], scale)
         end
-        currentModule.gradInput = currentModule:backward({__input[1], self.initState}, {gradOutput[1], currentGradState}, scale)
-        gradInput[1] = currentModule.gradInput[1]
-        self.gradState = currentModule.gradInput[2]
 
         if torch.isTensor(input) then --join a table into a time tensor
             gradInput = self.splitInput:backward(input, gradInput)
