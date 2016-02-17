@@ -1,6 +1,5 @@
 require 'nn'
 require 'nngraph'
-require 'recurrent'
 
 
 local function efficient1x1Conv(inputSize, outputDim, T)
@@ -30,7 +29,7 @@ local function attention(T, eInputSize, dInputSize)
 end
 
 
-function AttentiveRecurrent(rnnModule, attentionModule)
+local function AttentiveRecurrent(rnnModule, attentionModule)
   local input = nn.Identity()()
   local state = nn.Identity()()
   local attnInput = nn.SelectTable(2)(input)
@@ -44,40 +43,30 @@ function AttentiveRecurrent(rnnModule, attentionModule)
   return nn.gModule({input,state}, {rnnOutput, newState})
 end
 
-function AttentiveGRU(inputSize, outputSize, attnSize, attnTime)
+local function AttentiveGRU(inputSize, outputSize, attnSize, attnTime)
   local config = recurrent.rnnModules.GRU(inputSize + attnSize, outputSize)
   local aGRUModule = AttentiveRecurrent(config.rnnModule, attention(attnTime, attnSize, outputSize))
   local name = 'nn.AttentiveGRU({' .. inputSize .. ', ' .. attnTime .. ' x ' .. attnSize .. '} -> '
   name = name  .. outputSize .. ', {' .. outputSize .. ', ' .. attnSize ..'})'
-  local aGruConfig = {
-      rnnModule = aGRUModule,
-      initState = {gruConfig.initState, torch.zeros(1, attnSize)},
-      name = name
-  }
-  return nn.RecurrentContainer(aGruConfig)
-end
-
-function AttentiveLSTM(inputSize, outputSize, attnSize, attnTime)
-  local config = recurrent.rnnModules.LSTM(inputSize + attnSize, outputSize)
-  local aGRUModule = AttentiveRecurrent(config.rnnModule, attention(attnTime, attnSize, 2*outputSize))
-  local name = 'nn.AttentiveGRU({' .. inputSize .. ', ' .. attnTime .. ' x ' .. attnSize .. '} -> '
-  name = name  .. outputSize .. ', {' .. 2*outputSize .. ', ' .. attnSize ..'})'
-  local aGruConfig = {
+  return {
       rnnModule = aGRUModule,
       initState = {config.initState, torch.zeros(1, attnSize)},
       name = name
   }
-  return nn.RecurrentContainer(aGruConfig)
 end
 
-function test()
-  local d = 3
-  local o = 5
-  local t = 6
-  local e = 7
-  local aGRU = AttentiveLSTM(d,o,e,t)
-  local b = 1
-  local x= {torch.rand(b,d), torch.rand(b,t,e)}
-  local
-  return = aGRU:forward(x)
+local function AttentiveLSTM(inputSize, outputSize, attnSize, attnTime)
+  local config = recurrent.rnnModules.LSTM(inputSize + attnSize, outputSize)
+  local aLSTM = AttentiveRecurrent(config.rnnModule, attention(attnTime, attnSize, 2*outputSize))
+  local name = 'nn.AttentiveLSTM({' .. inputSize .. ', ' .. attnTime .. ' x ' .. attnSize .. '} -> '
+  name = name  .. outputSize .. ', {' .. 2*outputSize .. ', ' .. attnSize ..'})'
+  return {
+      rnnModule = aLSTM,
+      initState = {config.initState, torch.zeros(1, attnSize)},
+      name = name
+  }
 end
+
+
+recurrent.rnnModules['AttentiveLSTM'] = AttentiveLSTM
+recurrent.rnnModules['AttentiveGRU'] = AttentiveGRU

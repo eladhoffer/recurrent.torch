@@ -13,6 +13,7 @@ torch.include('recurrent', 'LSTM.lua')
 torch.include('recurrent', 'MultiLayerLSTM.lua')
 torch.include('recurrent', 'RNN.lua')
 torch.include('recurrent', 'iRNN.lua')
+torch.include('recurrent', 'Attention.lua')
 
 --registers all recurrent model under 'recurrent'
 for name, func in pairs(recurrent.rnnModules) do
