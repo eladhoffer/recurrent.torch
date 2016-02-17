@@ -127,7 +127,7 @@ function Recurrent:__updateOneTimeStep(input)
   if self.currentIteration > #self.modules then
       self:setIterations(self.currentIteration)
   end
-  self:resizeStateBatch(input:size(1))
+  self:resizeStateBatch(recurrent.utils.batchSize(input))
   currentOutput = self.modules[self.currentIteration]:forward({input, self.state})
   self.currentIteration = self.currentIteration + 1
   return currentOutput[1], currentOutput[2]

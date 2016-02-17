@@ -41,7 +41,7 @@ end
 local function recursiveBatchResize(t, batchSize)
     if torch.type(t) == 'table' then
         for key,_ in pairs(t) do
-            t[key] = recursiveBatchResize(t, batchSize)
+            t[key] = recursiveBatchResize(t[key], batchSize)
         end
     elseif torch.isTensor(t) then
         local sz = t:size()
@@ -60,6 +60,15 @@ local function recursiveBatchResize(t, batchSize)
     return t
 end
 
+local function batchSize(x)
+  if torch.isTensor(x) then
+    return x:size(1)
+  else
+    return batchSize(x[1])
+  end
+end
+
 recurrent.utils.recursiveBatchResize = recursiveBatchResize
 recurrent.utils.recursiveBatchExpand = recursiveBatchExpand
 recurrent.utils.recursiveCopy = recursiveCopy
+recurrent.utils.batchSize = batchSize
