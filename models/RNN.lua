@@ -4,7 +4,7 @@ local function RNN(inputSize, outputSize)
     local rnn = nn.Sequential()
     rnn:add(nn.JoinTable(1,1))
     rnn:add(linear)
-    rnn:add(nn.Sigmoid())
+    rnn:add(nn.Tanh())
     rnn:add(nn.ConcatTable():add(nn.Identity()):add(nn.Identity()))
     return {
       rnnModule = rnn,

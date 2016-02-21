@@ -1,6 +1,7 @@
 require 'nngraph'
 --adapted from: https://github.com/karpathy/char-rnn
 local function LSTM(inputSize, outputSize, initWeights, forgetBias)
+    local forgetBias = forgetBias or 1
     local initWeights = initWeights or 0.08
     -- there will be 2 input: {input, state}
     -- where state is concatenated
@@ -14,7 +15,7 @@ local function LSTM(inputSize, outputSize, initWeights, forgetBias)
 
     -- evaluate the input sums at once for efficiency
     local i2h = nn.Linear(inputSize, 4 * outputSize)(input)
-    local h2h = nn.Linear(outputSize, 4 * outputSize)(prev_h)
+    local h2h = nn.Linear(outputSize, 4 * outputSize, false)(prev_h)
 
 
     local all_input_sums = nn.CAddTable()({i2h, h2h})
@@ -51,7 +52,6 @@ local function LSTM(inputSize, outputSize, initWeights, forgetBias)
     )
     if forgetBias then
       i2h.data.module.bias:narrow(1, outputSize+1, outputSize):fill(forgetBias)
-      h2h.data.module.bias:narrow(1, outputSize+1, outputSize):fill(forgetBias)
     end
 
     return {
