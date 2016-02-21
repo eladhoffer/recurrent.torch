@@ -30,11 +30,10 @@ local function MultiLayerLSTM(inputSize, hiddenSize, n, dropout, initWeights, fo
     end
     -- evaluate the input sums at once for efficiency
     local i2h = nn.Linear(inputSize_L, 4 * hiddenSize)(x)
-    local h2h = nn.Linear(hiddenSize, 4 * hiddenSize)(prev_h)
+    local h2h = nn.Linear(hiddenSize, 4 * hiddenSize, false)(prev_h)
 
     --remember forget gate biases for easy initialization
     table.insert(forgetGatesBiases, i2h.data.module.bias:narrow(1, hiddenSize+1, hiddenSize))
-    table.insert(forgetGatesBiases, h2h.data.module.bias:narrow(1, hiddenSize+1, hiddenSize))
 
     local all_input_sums = nn.CAddTable()({i2h, h2h})
     local reshaped = nn.Reshape(4, hiddenSize)(all_input_sums)

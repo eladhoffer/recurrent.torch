@@ -4,7 +4,7 @@ adapted from: https://github.com/karpathy/char-rnn/blob/master/model/GRU.lua
 Creates one timestep of one GRU
 Paper reference: http://arxiv.org/pdf/1412.3555v1.pdf
 ]]--
-local function GRU(inputSize, outputSize, initWeights, forgetBias)
+local function GRU(inputSize, outputSize, initWeights)
     -- there will be 2 input: {input, state}
     local initWeights = initWeights or 0.08
     local input = nn.Identity()()
@@ -13,7 +13,7 @@ local function GRU(inputSize, outputSize, initWeights, forgetBias)
 
     function new_input_sum(insize, xv, hv)
         local i2h = nn.Linear(insize, outputSize)(xv)
-        local h2h = nn.Linear(outputSize, outputSize)(hv)
+        local h2h = nn.Linear(outputSize, outputSize, false)(hv)
         return nn.CAddTable()({i2h, h2h})
     end
 
@@ -23,7 +23,7 @@ local function GRU(inputSize, outputSize, initWeights, forgetBias)
     local reset_gate = nn.Sigmoid()(new_input_sum(inputSize, input, state))
     -- compute candidate hidden state
     local gated_hidden = nn.CMulTable()({reset_gate, state})
-    local p2 = nn.Linear(outputSize, outputSize)(gated_hidden)
+    local p2 = nn.Linear(outputSize, outputSize, false)(gated_hidden)
     local p1 = nn.Linear(inputSize, outputSize)(input)
     local hidden_candidate = nn.Tanh()(nn.CAddTable()({p1,p2}))
     -- compute new interpolated hidden state, based on the update gate
