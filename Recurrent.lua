@@ -246,11 +246,6 @@ function Recurrent:parameters()
     return self.modules[1]:parameters()
 end
 
-function Recurrent:shareWeights()
-    for i=2,#self.modules do
-        self.modules[i]:share(self.modules[1],'weight','bias','gradWeight','gradBias','running_mean','running_std')
-    end
-end
 
 function Recurrent:training()
     parent.training(self)
@@ -264,10 +259,19 @@ function Recurrent:evaluate()
     return self
 end
 
-function Recurrent:type(t)
-    parent.type(self, t)
-    self:shareWeights()
+function Recurrent:type(t, tensorCache)
+    local tensorCache = tensorCache or {}
+    parent.type(self, t, tensorCache)
     return self
+end
+
+function Recurrent:clearState()
+   self:setIterations(1, true)
+   self:resizeStateBatch(1)
+   self.splitInput:clearState()
+   self.joinOutput:clearState()
+   nn.utils.clear(self, {'gradState', 'initState'})
+   return parent.clearState(self)
 end
 
 function Recurrent:__tostring__()

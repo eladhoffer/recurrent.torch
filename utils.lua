@@ -39,25 +39,27 @@ end
 
 
 local function recursiveBatchResize(t, batchSize)
-    if torch.type(t) == 'table' then
-        for key,_ in pairs(t) do
-            t[key] = recursiveBatchResize(t[key], batchSize)
-        end
-    elseif torch.isTensor(t) then
-        local sz = t:size()
-        if sz[1] ~= batchSize then
-            local init = sz[1] < batchSize
-            sz[1] = batchSize
-            t:resize(sz)
-            if init then
-              t:zero() --initialize values to zero
-            end
-        end
-    else
-        error("expecting nested tensors or tables. Got "..
-        torch.type(t).." instead")
+  if torch.type(t) == 'table' then
+    for key,_ in pairs(t) do
+      t[key] = recursiveBatchResize(t[key], batchSize)
     end
-    return t
+  elseif torch.isTensor(t) then
+    if t:dim()> 0 then
+      local sz = t:size()
+      if sz[1] ~= batchSize then
+        local init = sz[1] < batchSize
+        sz[1] = batchSize
+        t:resize(sz)
+        if init then
+          t:zero() --initialize values to zero
+        end
+      end
+    end
+  else
+    error("expecting nested tensors or tables. Got "..
+    torch.type(t).." instead")
+  end
+  return t
 end
 
 local function batchSize(x)
