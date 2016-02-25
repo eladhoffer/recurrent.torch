@@ -3,17 +3,17 @@ require 'nn'
 
 recurrent = {}
 recurrent.rnnModules = {}
-torch.include('recurrent', 'utils.lua')
-torch.include('recurrent', 'Recurrent.lua')
-torch.include('recurrent', 'TemporalModule.lua')
-torch.include('recurrent', 'TemporalCriterion.lua')
+require('recurrent.utils')
+require('recurrent.Recurrent')
+require('recurrent.TemporalModule')
+require('recurrent.TemporalCriterion')
 
-torch.include('recurrent', 'GRU.lua')
-torch.include('recurrent', 'LSTM.lua')
-torch.include('recurrent', 'MultiLayerLSTM.lua')
-torch.include('recurrent', 'RNN.lua')
-torch.include('recurrent', 'iRNN.lua')
-torch.include('recurrent', 'Attention.lua')
+require('recurrent.GRU')
+require('recurrent.LSTM')
+require('recurrent.MultiLayerLSTM')
+require('recurrent.RNN')
+require('recurrent.iRNN')
+require('recurrent.Attention')
 
 --registers all recurrent model under 'recurrent'
 for name, func in pairs(recurrent.rnnModules) do
