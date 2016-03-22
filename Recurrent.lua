@@ -169,7 +169,7 @@ function Recurrent:updateOutput(input)
 
     self:zeroGradState()
 
-    return self.output, self.state
+    return self.output
 end
 
 
@@ -213,7 +213,7 @@ function Recurrent:backward(input, gradOutput, scale)
         end
         self.gradInput = gradInput
     end
-    return self.gradInput, self.gradState
+    return self.gradInput
 end
 
 function Recurrent:zeroGradParameters()
