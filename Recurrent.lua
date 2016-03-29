@@ -28,7 +28,7 @@ function Recurrent:setMode(mode) --mode can be 'sequence' or 'single'
     return self
 end
 
-function Recurrent:setStateful(mode)
+function Recurrent:isStateful(mode)
     self.stateful = mode
     return self
 end
