@@ -1,4 +1,10 @@
-# Recurrent Container for Torch nn modules
+# Recurrent modules for Torch
+**Install using**
+```
+luarocks install recurrent
+```
+### Recurrent container
+
 This is a simple and efficient way to create recurrent nn modules in Torch. It consists of a container **nn.RecurrentContainer**, which holds a recurrent module.
 This recurrent module is expected to receive an input of: `{input, state}` and outputs `{output, state}`. This way, a recurrent module updates its state while giving an output.
 
@@ -20,6 +26,7 @@ local recurrent = nn.RecurrentContainer(rnnModule)
 ```
 if `rnnModule` is a table with fields `{rnnModule, initState}` then state will be automatically initialized.
 
+### RNN/LSTM/GRU
 There are number of pre-configured rnn modules that will be added to `nn` namespace:
 ```lua
 nn.LSTM(inputSize, outputSize, [initWeight, forgetBias])
