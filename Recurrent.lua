@@ -6,6 +6,7 @@ function Recurrent:__init(recurrentModule)
     self.state = torch.Tensor()
     self.gradState = torch.Tensor()
     self.initState = torch.Tensor()
+    self.stateful = true
     self.currentIteration = 1
     self.seqMode = false
     self:setTimeDim(2)
@@ -24,6 +25,11 @@ end
 function Recurrent:setMode(mode) --mode can be 'sequence' or 'single'
     assert(mode == 'sequence' or mode == 'single')
     self.seqMode = (mode == 'sequence')
+    return self
+end
+
+function Recurrent:setStateful(mode)
+    self.stateful = mode
     return self
 end
 
@@ -128,7 +134,7 @@ function Recurrent:__updateOneTimeStep(input)
       self:setIterations(self.currentIteration)
   end
   self:resizeStateBatch(recurrent.utils.batchSize(input))
-  currentOutput = self.modules[self.currentIteration]:forward({input, self.state})
+  local currentOutput = self.modules[self.currentIteration]:forward({input, self.state})
   self.currentIteration = self.currentIteration + 1
   return currentOutput[1], currentOutput[2]
 end
@@ -137,6 +143,9 @@ function Recurrent:updateOutput(input)
     assert(torch.type(self.state) == 'table' or self.state:dim()>0, "State must be initialized")
     if not self.train then
         self:forget()
+    end
+    if not self.stateful then
+      self:zeroState()
     end
 
     local currentOutput

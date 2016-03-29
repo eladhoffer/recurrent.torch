@@ -8,6 +8,7 @@ require('recurrent.Recurrent')
 require('recurrent.TemporalModule')
 require('recurrent.TemporalCriterion')
 require('recurrent.MaskPaddingCriterion')
+require('recurrent.Reverse')
 
 require('recurrent.GRU')
 require('recurrent.LSTM')
