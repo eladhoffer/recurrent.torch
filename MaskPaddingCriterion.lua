@@ -8,6 +8,10 @@ function MaskPaddingCriterion:__init(criterion, padVal)
   self:type(criterion.gradInput:type())
 end
 
+function MaskPaddingCriterion:setPadding(padding)
+  self.padVal = padding
+end
+
 function MaskPaddingCriterion:reduceReshape(input, target)
   local target = target:contiguous():view(-1,1)
   self.index = self.index:long()
