@@ -10,22 +10,16 @@ local function GRU(inputSize, outputSize, initWeights)
     local input = nn.Identity()()
     local state = nn.Identity()()
 
-
-    function new_input_sum(insize, xv, hv)
-        local i2h = nn.Linear(insize, outputSize)(xv)
-        local h2h = nn.Linear(outputSize, outputSize, false)(hv)
-        return nn.CAddTable()({i2h, h2h})
-    end
-
     -- GRU tick
     -- forward the update and reset gates
-    local update_gate = nn.Sigmoid()(new_input_sum(inputSize, input, state))
-    local reset_gate = nn.Sigmoid()(new_input_sum(inputSize, input, state))
+    local input_state = nn.JoinTable(1,1)({input, state})
+    local gates = nn.Sigmoid()(nn.Linear(inputSize + outputSize, 2*outputSize)(input_state))
+    local update_gate, reset_gate = nn.SplitTable(1,2)(nn.Reshape(2, outputSize)(gates)):split(2)
+
     -- compute candidate hidden state
     local gated_hidden = nn.CMulTable()({reset_gate, state})
-    local p2 = nn.Linear(outputSize, outputSize, false)(gated_hidden)
-    local p1 = nn.Linear(inputSize, outputSize)(input)
-    local hidden_candidate = nn.Tanh()(nn.CAddTable()({p1,p2}))
+    local input_gHidden = nn.JoinTable(1,1)({input, gated_hidden})
+    local hidden_candidate = nn.Tanh()(nn.Linear(inputSize + outputSize, outputSize)(input_gHidden))
     -- compute new interpolated hidden state, based on the update gate
     local zh = nn.CMulTable()({update_gate, hidden_candidate})
     local zhm1 = nn.CMulTable()({nn.AddConstant(1,false)(nn.MulConstant(-1,false)(update_gate)), state})

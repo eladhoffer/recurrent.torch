@@ -9,6 +9,7 @@ function Recurrent:__init(recurrentModule)
     self.stateful = true
     self.currentIteration = 1
     self.seqMode = false
+    self.batchSize = 1
     self:setTimeDim(2)
     if recurrentModule then
       self:add(recurrentModule)
@@ -95,8 +96,11 @@ function Recurrent:getState()
 end
 
 function Recurrent:resizeStateBatch(batchSize)
+    if self.batchSize == batchSize then return end
     self.initState = recurrent.utils.recursiveBatchResize(self.initState, batchSize)
     self.state = recurrent.utils.recursiveBatchResize(self.state, batchSize)
+    self.gradState = nn.utils.recursiveResizeAs(self.gradState, self.state)
+    self.batchSize = batchSize
 end
 
 function Recurrent:setGradState(gradState)
@@ -112,7 +116,6 @@ function Recurrent:getGradState()
 end
 
 function Recurrent:zeroGradState()
-    self.gradState = nn.utils.recursiveResizeAs(self.gradState, self.state)
     nn.utils.recursiveFill(self.gradState, 0)
 end
 
@@ -133,7 +136,7 @@ function Recurrent:__updateOneTimeStep(input)
   if self.currentIteration > #self.modules then
       self:setIterations(self.currentIteration)
   end
-  self:resizeStateBatch(recurrent.utils.batchSize(input))
+  self:resizeStateBatch(input:size(1))
   local currentOutput = self.modules[self.currentIteration]:forward({input, self.state})
   self.currentIteration = self.currentIteration + 1
   return currentOutput[1], currentOutput[2]
@@ -198,9 +201,6 @@ end
 
 function Recurrent:backward(input, gradOutput, scale)
     assert(self.train, "must be in training mode")
-    if (torch.type(self.gradState) ~= 'table' and self.gradState:dim() == 0) then
-        self:zeroGradState()
-    end
 
     local scale = scale or 1
     if not self.seqMode then
