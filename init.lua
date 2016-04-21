@@ -22,13 +22,20 @@ for name, func in pairs(recurrent.rnnModules) do
   nn[name] = function(...) return nn.RecurrentContainer(func(...)) end
 end
 
+require('recurrent.cudnnUtils') --replaces available modules with cudnn counterpart
+
+
 -------Adding recurrent function to nn.Container---------------
 local Container = nn.Container
 function Container:applyRecurrent(func, ...)
     local retVals = {}
-    for i, rnn in pairs(self:findModules('nn.RecurrentContainer')) do
-        retVals[i] = rnn[func](rnn, ...)
+    for _,m in pairs(self:listModules()) do    
+        if m.__typename == 'nn.RecurrentContainer' then
+            local val = m[func](m, ...)
+            table.insert(retVals, val)
+        end
     end
+
     return retVals
 end
 
@@ -36,7 +43,7 @@ end
 local containerAddfunctions = {
    'setMode', 'sequence', 'single', 'getState',
    'zeroGradState', 'getGradState', 'forget',
-   'resizeStateBatch', 'setIterations', 'zeroState'
+   'resizeStateBatch', 'setIterations', 'zeroState', 'isStateful'
   }
 
 for _,fname in pairs(containerAddfunctions) do
@@ -57,7 +64,7 @@ end
 
 function Container:accGradState(sourceState)
     local targetState = self:getGradState()
-    nn.utils.recursiveAdd(targetState, sourceState)
+    recurrent.utils.recursiveAdd(targetState, sourceState)
 end
 --
 --function Container:shareGradState(container)

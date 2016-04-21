@@ -1,6 +1,7 @@
 recurrent.utils = {}
 
 local function recursiveCopy(t1, t2)
+    local t1, t2 = nn.utils.recursiveResizeAs(t1,t2)
     if torch.type(t2) == 'table' then
         t1 = (torch.type(t1) == 'table') and t1 or {t1}
         for key,_ in pairs(t2) do
@@ -17,6 +18,10 @@ local function recursiveCopy(t1, t2)
     return t1, t2
 end
 
+local function recursiveAdd(t1,t2)
+    local t1, t2 = nn.utils.recursiveResizeAs(t1,t2)
+    return nn.utils.recursiveAdd(t1,t2)
+end
 
 local function recursiveBatchExpand(t1, t2, batchSize)
     if torch.type(t2) == 'table' then
@@ -73,4 +78,5 @@ end
 recurrent.utils.recursiveBatchResize = recursiveBatchResize
 recurrent.utils.recursiveBatchExpand = recursiveBatchExpand
 recurrent.utils.recursiveCopy = recursiveCopy
+recurrent.utils.recursiveAdd = recursiveAdd
 recurrent.utils.batchSize = batchSize
