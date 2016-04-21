@@ -19,7 +19,22 @@ local function viewTimeAsBatch(input)
   return input:view(unpack(szInput))
 end
 
+function TemporalCriterion:makeContiguous(input, target)
+   if not input:isContiguous() then
+      self._input = self._input or input.new()
+      self._input:typeAs(input):resizeAs(input):copy(input)
+      input = self._input
+   end
+   if target and not target:isContiguous() then
+      self._target = self._target or target.new()
+      self._target:typeAs(target):resizeAs(target):copy(target)
+      target = self._target
+   end
+   return input, target
+end
+
 function TemporalCriterion:updateOutput(input, target)
+  local input, target = self:makeContiguous(input, target)
   if torch.isTensor(input) and self.evalAsBatch then
     self.output = self.criterion:updateOutput(viewTimeAsBatch(input), viewTimeAsBatch(target)) * input:size(2)
   else
@@ -40,6 +55,7 @@ function TemporalCriterion:updateOutput(input, target)
 end
 
 function TemporalCriterion:updateGradInput(input, target)
+  local input, target = self:makeContiguous(input, target)
   if torch.isTensor(input) and self.evalAsBatch then
     self.gradInput = self.criterion:updateGradInput(viewTimeAsBatch(input), viewTimeAsBatch(target)):viewAs(input) * input:size(2)
   else

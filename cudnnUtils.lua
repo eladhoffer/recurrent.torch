@@ -30,8 +30,10 @@ function wrapCudnnModule(m)
 end
 
 local moduleList = {
-    RNN = 'RNN',
+    RNN = 'RNNTanh',
+    iRNN = 'RNNReLU',
     LSTM = 'LSTM',
+    BLSTM = 'BLSTM',
     GRU = 'GRU'
 }
 

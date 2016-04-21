@@ -18,22 +18,41 @@ local function viewTime(input, timeLength)
     szInput[1] = timeLength
     return input:view(-1, unpack(szInput))
 end
+
+function TemporalModule:makeContiguous(input, gradOutput)
+   if not input:isContiguous() then
+      self._input = self._input or input.new()
+      self._input:typeAs(input):resizeAs(input):copy(input)
+      input = self._input
+   end
+   if gradOutput and not gradOutput:isContiguous() then
+      self._gradOutput = self._gradOutput or gradOutput.new()
+      self._gradOutput:typeAs(gradOutput):resizeAs(gradOutput):copy(gradOutput)
+      gradOutput = self._gradOutput
+   end
+   return input, gradOutput
+end
+
 function TemporalModule:updateOutput(input)
+    local input = self:makeContiguous(input)
     local timeLength = input:size(2)
     self.output = viewTime(parent.updateOutput(self, viewTimeAsBatch(input)), timeLength)
     return self.output
 end
 
 function TemporalModule:updateGradInput(input, gradOutput,...)
+    local input, gradOutput = self:makeContiguous(input, gradOutput)
     self.gradInput = parent.updateGradInput(self, viewTimeAsBatch(input), viewTimeAsBatch(gradOutput), ...):viewAs(input)
     return self.gradInput
 end
 
 function TemporalModule:accGradParameters(input, gradOutput, ...)
+    local input, gradOutput = self:makeContiguous(input, gradOutput)
     parent.accGradParameters(self, viewTimeAsBatch(input), viewTimeAsBatch(gradOutput), ...)
 end
 
 function TemporalModule:backward(input, gradOutput,...)
+    local input, gradOutput = self:makeContiguous(input, gradOutput)
     self.gradInput = parent.backward(self, viewTimeAsBatch(input), viewTimeAsBatch(gradOutput), ...):viewAs(input)
     return self.gradInput
 end

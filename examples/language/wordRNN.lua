@@ -20,7 +20,6 @@ cmd:text('===>Model And Training Regime')
 cmd:option('-model',              'LSTM',                      'Recurrent model [RNN, iRNN, LSTM, GRU]')
 cmd:option('-seqLength',          50,                          'number of timesteps to unroll for')
 cmd:option('-rnnSize',            128,                         'size of rnn hidden layer')
-cmd:option('-embeddingSize',      64,                          'size of word embedding')
 cmd:option('-numLayers',          2,                           'number of layers in the LSTM')
 cmd:option('-dropout',            0.5,                           'dropout p value')
 cmd:option('-LR',                 2e-3,                        'learning rate')
@@ -87,21 +86,21 @@ else
     modelConfig = {}
     local rnnTypes = {LSTM = nn.LSTM, RNN = nn.RNN, GRU = nn.GRU, iRNN = nn.iRNN}
     local rnn = rnnTypes[opt.model]
-    local hiddenSize = opt.embeddingSize
+    local hiddenSize = opt.rnnSize
     modelConfig.recurrent = nn.Sequential()
     for i=1, opt.numLayers do
       modelConfig.recurrent:add(rnn(hiddenSize, opt.rnnSize, opt.initWeight))
+     -- modelConfig.recurrent:add(nn.TemporalModule(nn.BatchNormalization(opt.rnnSize)))
       if opt.dropout > 0 then
         modelConfig.recurrent:add(nn.Dropout(opt.dropout))
       end
       hiddenSize = opt.rnnSize
     end
-    modelConfig.embedder = nn.LookupTable(vocabSize, opt.embeddingSize)
+    modelConfig.embedder = nn.LookupTable(vocabSize, opt.rnnSize)
     modelConfig.classifier = nn.Linear(opt.rnnSize, vocabSize)
-  --  modelConfig.classifier = nn.TemporalConvolution(opt.rnnSize, vocabSize, 1)
 end
 
-
+modelConfig.classifier:share(modelConfig.embedder, 'weight', 'gradWeight')
 local trainingConfig = require 'utils.trainRecurrent'
 local train = trainingConfig.train
 local evaluate = trainingConfig.evaluate
@@ -130,7 +129,7 @@ repeat
 
   local LossTest = evaluate(data.testData)
 
-  print('\nSampled Text:\n' .. sample('the meaning of life is', 50, true))
+  --print('\nSampled Text:\n' .. sample('the meaning of life is', 50, true))
 
   print('\nTest Perplexity: ' .. torch.exp(LossTest))
   log:add{['Training Loss']= LossTrain, ['Validation Loss'] = LossVal, ['Test Loss'] = LossTest}
