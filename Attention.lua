@@ -25,7 +25,7 @@ local function attention(T, eInputSize, dInputSize)
   local a = nn.SoftMax()(u) -- size: batch x T
   local weightedH = nn.CMulTable(){h, nn.Replicate(eInputSize, 2, 1)(a)}
   local dtN = nn.Sum(1, 2)(weightedH) --output size: batch x eInputSize
-  return nn.gModule({h,dt}, {dtN})
+  return nn.gModule({h,dt}, {dtN, a})
 end
 
 
@@ -37,10 +37,10 @@ local function AttentiveRecurrent(rnnModule, attentionModule)
   local attnState = nn.SelectTable(2)(state)
   local rnnInput = nn.JoinTable(1,1)({nn.SelectTable(1)(input), attnState})
   local rnnOutput, rnnNewState = rnnModule({rnnInput, rnnState}):split(2)
-  local attnNewState = attentionModule({attnInput, rnnState})
+  local attnNewState, attention = unpack(attentionModule({attnInput, rnnState}))
   local newState = nn.Identity()({rnnNewState, attnNewState})
 
-  return nn.gModule({input,state}, {rnnOutput, newState})
+  return nn.gModule({input,state}, {rnnOutput, newState, attention})
 end
 
 local function AttentiveGRU(inputSize, outputSize, attnSize, attnTime)
