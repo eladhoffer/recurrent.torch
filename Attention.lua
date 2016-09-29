@@ -37,10 +37,12 @@ local function AttentiveRecurrent(rnnModule, attentionModule)
   local attnState = nn.SelectTable(2)(state)
   local rnnInput = nn.JoinTable(1,1)({nn.SelectTable(1)(input), attnState})
   local rnnOutput, rnnNewState = rnnModule({rnnInput, rnnState}):split(2)
-  local attnNewState, attention = unpack(attentionModule({attnInput, rnnState}))
+  local attn = attentionModule({attnInput, rnnState})
+  local attnNewState = nn.SelectTable(1)(attn)
+  local attnWeights = nn.SelectTable(2)(attn)
   local newState = nn.Identity()({rnnNewState, attnNewState})
 
-  return nn.gModule({input,state}, {rnnOutput, newState, attention})
+  return nn.gModule({input,state}, {rnnOutput, newState, attnWeights})
 end
 
 local function AttentiveGRU(inputSize, outputSize, attnSize, attnTime)
